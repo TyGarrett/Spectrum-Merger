@@ -58,10 +58,8 @@ public class spectrumDbUtil {
                     Peak p = new Peak((double)peakMzArray[i], (double)peakIntensityArray[i]);
                     list.addPeak(p);
                 }
-
-                return list;
             }
-
+            return list;
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
@@ -73,7 +71,7 @@ public class spectrumDbUtil {
              ResultSet rs    = stmt.executeQuery(query)){
 
             while (rs.next()) {
-                System.out.println(rs.getInt(1));
+                //System.out.println(rs.getInt(1));
             }
 
             return rs;
@@ -141,54 +139,10 @@ public class spectrumDbUtil {
             PeakList list = specDB.getSpectrumPeakIntensityByProteinID(1);
 
             for (Peak p : list.getSortedPeaks(true)) {
-                System.out.println(p.getM2z());
+                //System.out.println(p.getM2z());
             }
 
             specDB.disconnect();
         }
     }
-/*
-    public double[] convertBitArray(){
-        int massKey1 = (int)(mass1*MZ_KEY_SHIFT);
-        int massKey2 = (int)(mass2*MZ_KEY_SHIFT);
-        getSpectraMassStatement.setInt(1,massKey1);
-        getSpectraMassStatement.setInt(2,massKey2);
-        final ResultSet rs = getSpectraMassStatement.executeQuery();
-        int i=0;
-        while(rs.next())
-        {
-            int id = rs.getInt(1);
-
-            InputStream is = rs.getBinaryStream(2);
-            byte [] buffer = new byte[Float.BYTES];
-            ByteArrayInputStream bins ;
-            TFloatArrayList mzList = new TFloatArrayList();
-            TFloatArrayList intList = new TFloatArrayList();
-
-            while((is.read(buffer))>0)
-            {
-                float f =ByteBuffer.wrap(buffer).getFloat();
-                mzList.add(f);
-            }
-            is = rs.getBinaryStream(3);
-            buffer = new byte[Float.BYTES];
-            while((is.read(buffer))>0)
-            {
-                float f =ByteBuffer.wrap(buffer).getFloat();
-                intList.add(f);
-            }
-            if(id!=spectraList.get(i).id)
-            {
-                System.out.println(id+ " "+spectraList.get(i).id);
-                System.out.println("Mismatch !");
-                System.exit(-1);
-            }
-
-            spectraList.get(i).setMzList(mzList);
-            spectraList.get(i).setIntensityList(intList);
-            i++;
-        }
-    }
-*/
-
 }

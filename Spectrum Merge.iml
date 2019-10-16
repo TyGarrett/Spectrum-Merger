@@ -42,5 +42,19 @@
         </SOURCES>
       </library>
     </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="file://$USER_HOME$/jarFiles/census" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES>
+          <root url="file://$USER_HOME$/jarFiles/census" />
+          <root url="file://$USER_HOME$/jarFiles/census/mergeCensusout" />
+        </SOURCES>
+        <jarDirectory url="file://$USER_HOME$/jarFiles/census" recursive="false" />
+        <jarDirectory url="file://$USER_HOME$/jarFiles/census" recursive="false" type="SOURCES" />
+      </library>
+    </orderEntry>
   </component>
 </module>

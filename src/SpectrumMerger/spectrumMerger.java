@@ -82,7 +82,10 @@ public class spectrumMerger {
         // used to normalize the peakList
         double maxIntensity = list.getMaxIntensity();
 
+        int count = 0;
+
         for (Peak p : list.getSortedPeaks(true)) {
+            count++;
             double intensity = p.getIntensity();
             int M2z = (int) Math.round(p.getM2z() * M2Z_ROUNDING_THRESHOLD);
 
@@ -92,6 +95,8 @@ public class spectrumMerger {
             double normalizedIntensity = intensity/maxIntensity;
             specArray[M2z] += normalizedIntensity;
         }
+
+        System.out.println(count);
     }
 
     private ArrayList<Peak> normalize(ArrayList<Peak> peakList){
@@ -144,6 +149,9 @@ public class spectrumMerger {
 
     private Complex[] ftrans(){
 
+        for (int i = 0; i<specArray.length; i++){
+            //System.out.println(specArray[i]);
+        }
         FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
         Complex[] comp = fft.transform(specArray, TransformType.FORWARD);
 
