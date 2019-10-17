@@ -192,6 +192,135 @@ public class spectrumMerger {
         return counter;
     }
 
+    public void printCompData(Complex[] comp){
+
+        double meanReal = 0;
+        double meanImj = 0;
+        double meanComb = 0;
+
+
+        double minReal = Double.MAX_VALUE;
+        double maxReal = Double.MIN_VALUE;
+        double minImj = Double.MAX_VALUE;
+        double maxImj = Double.MIN_VALUE;
+
+        double minComb = Double.MAX_VALUE;
+        double maxComb = Double.MIN_VALUE;
+
+        double sdReal = 0;
+        double sdImj = 0;
+        double sdComb = 0;
+
+        int pointsAbove20Real = 0;
+        int pointsAbove20Imj = 0;
+        int pointsAbove20Comb = 0;
+
+        int pointsAbove10Real = 0;
+        int pointsAbove10Imj = 0;
+        int pointsAbove10Comb = 0;
+
+        int pointsAbove30Comb = 0;
+        int pointsAbove40Comb = 0;
+
+
+
+
+        double[] peaks = new double[20];
+
+
+        int counter = 1;
+        for(Complex c : comp){
+
+            double dist = Math.pow(c.getReal(),2) + Math.pow(c.getImaginary(), 2);
+            dist = Math.sqrt(dist);
+
+            meanReal = (meanReal + c.getReal())/counter;
+            meanImj = (meanImj + c.getImaginary())/counter;
+            meanComb = (meanComb + dist)/counter;
+
+            if(minReal >= c.getReal()) minReal = c.getReal();
+            if(maxReal <= c.getReal()) maxReal = c.getReal();
+
+            if(minImj >= c.getImaginary()) minImj = c.getImaginary();
+            if(maxImj <= c.getImaginary()) maxImj = c.getImaginary();
+
+
+            if(minComb >= dist) minComb = dist;
+            if(maxComb <= dist) maxComb = dist;
+
+            if(c.getReal() > 20) {
+                pointsAbove20Real++;
+            }
+            if(c.getImaginary() > 20) {
+                pointsAbove20Imj++;
+            }
+
+            if(c.getImaginary() > 20) {
+                pointsAbove20Imj++;
+            }
+            if(dist > 20) pointsAbove20Comb++;
+
+            if(c.getReal() > 10) pointsAbove10Real++;
+            if(c.getImaginary() > 10) pointsAbove10Imj++;
+            if(dist > 10) pointsAbove10Comb++;
+
+            if(dist > 30) pointsAbove30Comb++;
+            if(dist > 67) pointsAbove40Comb++;
+
+
+
+            counter++;
+        }
+
+        counter = 1;
+        for(Complex c : comp){
+            double dist = Math.pow(c.getReal(),2) + Math.pow(c.getImaginary(), 2);
+
+            sdReal += Math.pow((c.getReal() - meanReal),2) / comp.length;
+            sdImj += Math.pow((c.getImaginary() - meanImj),2) / comp.length;
+            sdComb += Math.pow((dist - meanComb),2) / comp.length;
+
+            counter++;
+        }
+
+
+        System.out.println("--------mean--------");
+        //System.out.println("meanReal: " + meanReal);
+        //System.out.println("meanImj: " + meanImj);
+        System.out.println("meanComb: " + meanComb);
+
+        System.out.println("--------mix/max--------");
+        //System.out.println("minReal: " + minReal);
+        //System.out.println("maxReal: " + maxReal);
+        //System.out.println("minImj: " + minImj);
+        //System.out.println("maxImj: " + maxImj);
+        System.out.println("minComb: " + minComb);
+        System.out.println("maxComb: " + maxComb);
+
+        System.out.println("--------sd--------");
+        //System.out.println("sdReal: " + sdReal);
+        //System.out.println("sdImj: " + sdImj);
+        System.out.println("sdComb: " + sdComb);
+
+        System.out.println("--------points above 20--------");
+        //System.out.println("pointsAbove20Real: " + pointsAbove20Real);
+        //System.out.println("pointsAbove20Imj: " + pointsAbove20Imj);
+        System.out.println("pointsAbove20Comb: " + pointsAbove20Comb);
+
+        System.out.println("--------points above 10--------");
+        //System.out.println("pointsAbove10Real: " + pointsAbove10Real);
+        //System.out.println("pointsAbove10Imj: " + pointsAbove10Imj);
+        System.out.println("pointsAbove10Comb: " + pointsAbove10Comb);
+
+        System.out.println("pointsAbove30Comb: " + pointsAbove30Comb);
+        System.out.println("pointsAbove40Comb: " + pointsAbove40Comb);
+
+
+    }
+
+    public double[] getSpecArr(){
+        return specArray;
+    }
 
 
     public static void main(String[] args) throws IOException, SQLException {
@@ -210,9 +339,13 @@ public class spectrumMerger {
         System.out.println(sm.getNumberPeaks(comp));
         System.out.println(sm.getNumberPeaks());
 
-        for (Complex c : comp){
+        //sm.printCompData(comp);
+        fileManager fm = new fileManager();
+        fm.writeFFTtoCSV(comp);
+        fm.writeCombinedSpectrumtoCSV(sm.getSpecArr());
+        //for (Complex c : comp){
             //System.out.println(c);
-        }
+        //}
 
         /*
         SpectrumReader sr = new SpectrumReader(MS2_FILE_PATH, MS2_FILE_FORMAT);
