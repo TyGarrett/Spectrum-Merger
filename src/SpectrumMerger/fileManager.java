@@ -1,6 +1,10 @@
 package SpectrumMerger;
 
+import edu.scripps.pms.util.spectrum.Peak;
+import edu.scripps.pms.util.spectrum.PeakList;
+import javafx.util.Pair;
 import org.apache.commons.math3.complex.Complex;
+import org.jboss.util.Null;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -34,12 +38,11 @@ public class fileManager {
         csvWriter.close();
     }
 
-    public void writeCombinedSpectrumtoCSV(double[] comp) throws IOException {
-        FileWriter csvWriter = new FileWriter("/home/ty/jupyterNotebooks/CombinedSpectrum.csv");
-
+    public void writeCombinedSpectrumtoCSV(int[] specArr, int peptideID) throws IOException {
+        FileWriter csvWriter = new FileWriter("/home/ty/jupyterNotebooks/CombinedSpectrum"+peptideID+".csv");
         int counter = 0;
-        for (double c : comp) {
-            csvWriter.append(round(c,5)+",");
+        for (int intensity : specArr) {
+            csvWriter.append(intensity+",");
             csvWriter.append("\n");
 
             counter++;
@@ -47,6 +50,40 @@ public class fileManager {
 
         csvWriter.flush();
         csvWriter.close();
+
+        System.out.println("Wrote file{}".format(String.valueOf(peptideID)));
+    }
+
+    public void writeIndividualSpectrumtoCSV(PeakList[] list, int numFilesToCreate) throws IOException {
+
+        int counter = 0;
+        for (PeakList pl : list) {
+
+            if(counter == numFilesToCreate) return;
+
+            FileWriter csvWriter = new FileWriter("/home/ty/jupyterNotebooks/Spec/IndividualSpectrum" + counter + ".csv");
+            csvWriter.append("Mass");
+            csvWriter.append(",");
+            csvWriter.append("Intensity");
+            csvWriter.append("\n");
+
+            for (Peak p : pl.getSortedPeaks(false)) {
+
+                double intensity = p.getIntensity();
+                double M2z = p.getM2z();
+
+                csvWriter.append(M2z+","+intensity);
+                csvWriter.append("\n");
+            }
+
+            csvWriter.flush();
+            csvWriter.close();
+
+            counter++;
+        }
+
+
+
     }
 
     public static double round(double value, int places) {
