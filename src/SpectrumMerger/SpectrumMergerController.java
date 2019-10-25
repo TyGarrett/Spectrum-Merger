@@ -1,86 +1,240 @@
 package SpectrumMerger;
 
 import edu.scripps.pms.util.spectrum.PeakList;
-import javafx.util.Pair;
+import org.jboss.util.Null;
 
+import java.io.File;
 import java.io.IOException;
 
 class SpectrumMergerHandler {
+    spectrumDbUtil copyDBMT = new spectrumDbUtil("testLibDuplicateSpectraMerged.db");
 
+    public SpectrumMergerHandler(){
 
-    public static void main(String[] args) throws IOException {
-        generateAllPeptideSpectrum(0.005);
     }
 
-    public static void generateAllPeptideSpectrum(double threshold) throws IOException {
+    public static void main(String[] args) throws IOException {
+        String databaseFileName = "testLibDuplicateSpectra.db";
+        double threshold = 0.005;
+        int ppm = 500;
 
-        int numOfPeptideIds = 10;
+        updateDatabaseWithMergedSpectra(databaseFileName, ppm);
+    }
+
+    /**
+     * Generates a combined spectrum for each peptide in the database and outputs the value as a csv file labeled:
+     * combinedSpectrum[PeptideID].txt
+     *
+     * @param  databaseFileName database to pull data from
+     * @param  ppm parts per million value
+     */
+    private static void updateDatabaseWithMergedSpectra(String databaseFileName, int ppm) throws IOException {
+
+        int numOfPeptideIds = 16474;
+
+        spectrumDbUtil copyDB = new spectrumDbUtil("testLibDuplicateSpectraMerged.db");
+        spectrumDbUtil specDB = new spectrumDbUtil("testLibDuplicateSpectra.db");
+        specDB.connect();
+        copyDB.connect();
+
+        copyDB.createNewMergedSpectraTable();
+
         for(int peptideID = 0; peptideID < numOfPeptideIds; peptideID++){
 
             fileManager fm = new fileManager();
-            spectrumDbUtil specDB = new spectrumDbUtil();
-            spectrumMerger sm =  new spectrumMerger(peptideID, threshold);
+            spectrumMerger sm =  new spectrumMerger(peptideID);
 
-            PeakList[] individualPeptidePeakLists;
-            if(specDB.connect() == true) {
-                individualPeptidePeakLists = specDB.getSpectrumPeakIntensityByProteinID2(peptideID);
-                specDB.disconnect();
+            PeakList[] individualPeptidePeakLists = specDB.getSpectrumPeakIntensityByProteinID2(peptideID);
+
+            sm.addPeaksToSpecArray(individualPeptidePeakLists);
+            sm.mergePeaksByThreshold(ppm);
+
+            // Add the spec array to the database
+            copyDB.addMergedPeptideRow(peptideID, sm.getSpecArr(), sm.getNumberOfNonZeroElements());
+
+            //System.out.println("Done! Peptide ID: " + peptideID);
+        }
+        specDB.disconnect();
+        copyDB.disconnect();
+
+
+
+    }
+
+    /**
+     * Generates a combined spectrum for each peptide in the database and outputs the value as a csv file labeled:
+     * combinedSpectrum[PeptideID].txt
+     *
+     * @param  databaseFileName database to pull data from
+     * @param  ppm parts per million value
+     */
+    public void updateDatabaseWithMergedSpectraMultiThread(String databaseFileName, int ppm, int beginPeptide, int endPeptide) throws IOException {
+
+        System.out.println("begin: " + beginPeptide);
+        for(int peptideID = beginPeptide; peptideID < endPeptide; peptideID++){
+
+            fileManager fm = new fileManager();
+            spectrumMerger sm =  new spectrumMerger(peptideID);
+
+            PeakList[] individualPeptidePeakLists = getPeakListFromDatabase(peptideID, databaseFileName);
+
+            sm.addPeaksToSpecArray(individualPeptidePeakLists);
+            sm.mergePeaksByThreshold(ppm);
+
+            // Add the spec array to the database
+            if(copyDBMT.isConnected()) {
+                copyDBMT.addMergedPeptideRow(peptideID, sm.getSpecArr(), sm.getNumberOfNonZeroElements());
             }else{
-                System.out.println("Error Opening connection to Database");
-                return;
+                copyDBMT.connect();
+                copyDBMT.addMergedPeptideRow(peptideID, sm.getSpecArr(), sm.getNumberOfNonZeroElements());
             }
-            sm.combinePeaks(individualPeptidePeakLists);
-            sm.mergePeaksByThreshold();
 
-            fm.writeCombinedSpectrumtoCSV(sm.getSpecArr(), peptideID);
+            System.out.println("Done! Peptide ID: " + peptideID);
+        }
+
+    }
+
+    /**
+     * Generates a combined spectrum for each peptide in the database and outputs the value as a csv file labeled:
+     * combinedSpectrum[PeptideID].txt
+     *
+     * @param  databaseFileName database to pull data from
+     * @param  ppm parts per million value
+     */
+    private static void generateAllPeptideSpectrumMerged(String databaseFileName, int ppm) throws IOException {
+
+        int numOfPeptideIds = 10;
+
+        String dirName = "outputCSV/MergedSpectrum";
+
+        for(int peptideID = 0; peptideID < numOfPeptideIds; peptideID++){
+
+            fileManager fm = new fileManager();
+            spectrumMerger sm =  new spectrumMerger(peptideID);
+
+            PeakList[] individualPeptidePeakLists = getPeakListFromDatabase(peptideID, databaseFileName);
+
+            sm.addPeaksToSpecArray(individualPeptidePeakLists);
+            sm.mergePeaksByThreshold(ppm);
+            fm.writeSpectrumArrayToCSV(sm.getSpecArr(), peptideID, dirName);
 
             System.out.println("Done");
         }
 
     }
 
-    public static void generateSinglePeptideSpectrum(int peptideID, double threshold) throws IOException {
+    /**
+     * Generates a combined spectrum for each peptide in the database and outputs the value as a csv file labeled:
+     * combinedSpectrum[PeptideID].txt
+     *
+     * @param  databaseFileName database to pull data from     */
+    private static void generateAllPeptideSpectrumCombined(String databaseFileName) throws IOException {
+
+        int numOfPeptideIds = 10;
+
+        //DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+        //Date date = new Date();
+
+        String dirName = "outputCSV/CombinedSpectrum";
+
+        for(int peptideID = 0; peptideID < numOfPeptideIds; peptideID++){
+
+            fileManager fm = new fileManager();
+            spectrumMerger sm =  new spectrumMerger(peptideID);
+
+            PeakList[] individualPeptidePeakLists = getPeakListFromDatabase(peptideID, databaseFileName);
+
+            sm.addPeaksToSpecArray(individualPeptidePeakLists);
+            fm.writeSpectrumArrayToCSV(sm.getSpecArr(), peptideID, dirName);
+
+            System.out.println("Done");
+        }
+
+    }
+
+    /**
+     * Generates a combined spectrum for the given peptide in the database and outputs the value as a csv file labeled:
+     * combinedSpectrum[PeptideID].txt
+     *
+     * @param  peptideID the ID of the peptide to generate a combined spectrum
+     * @param  databaseFileName database to pull data from     */
+    public static void generateSinglePeptideSpectrumMerged(int peptideID, String databaseFileName, int ppm) throws IOException {
 
         fileManager fm = new fileManager();
-        spectrumDbUtil specDB = new spectrumDbUtil();
-        spectrumMerger sm =  new spectrumMerger(peptideID, threshold);
+        spectrumMerger sm =  new spectrumMerger(peptideID);
 
-        PeakList[] individualPeptidePeakLists;
-        if(specDB.connect() == true) {
-            individualPeptidePeakLists = specDB.getSpectrumPeakIntensityByProteinID2(peptideID);
-            specDB.disconnect();
-        }else{
-            System.out.println("Error Opening connection to Database");
-            return;
-        }
-        sm.combinePeaks(individualPeptidePeakLists);
-        sm.mergePeaksByThreshold();
+        //DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+        //Date date = new Date();
+        String dirName = "outputCSV";
 
-        fm.writeCombinedSpectrumtoCSV(sm.getSpecArr(), peptideID);
+        PeakList[] individualPeptidePeakLists = getPeakListFromDatabase(peptideID, databaseFileName);
+
+        sm.addPeaksToSpecArray(individualPeptidePeakLists);
+        sm.mergePeaksByThreshold(ppm);
+
+        fm.writeSpectrumArrayToCSV(sm.getSpecArr(), peptideID, dirName);
 
         System.out.println("Done");
 
     }
 
-    public static void generateSingleIndividualCSV(int peptideId, double threshold) throws IOException {
+    /**
+     * Generates a combined spectrum for the given peptide in the database and outputs the value as a csv file labeled:
+     * combinedSpectrum[PeptideID].txt
+     *
+     * @param  peptideID the ID of the peptide to generate a combined spectrum
+     * @param  databaseFileName database to pull data from     */
+    public static void generateSinglePeptideSpectrumCombined(int peptideID, String databaseFileName) throws IOException {
         fileManager fm = new fileManager();
-        spectrumDbUtil specDB = new spectrumDbUtil();
-        spectrumMerger sm =  new spectrumMerger(peptideId, threshold);
+        spectrumMerger sm =  new spectrumMerger(peptideID);
+        String dirName = "outputCSV";
+
+        PeakList[] individualPeptidePeakLists = getPeakListFromDatabase(peptideID, databaseFileName);
+
+        sm.addPeaksToSpecArray(individualPeptidePeakLists);
+
+        fm.writeSpectrumArrayToCSV(sm.getSpecArr(), peptideID, dirName);
+        System.out.println("Done");
+    }
+
+    /**
+     * Generates the individual spectrum's for the given peptide in the database and outputs the spectrum as a csv
+     * file labeled: individualSpectrum[PeptideID].txt
+     *
+     * @param  peptideID the ID of the peptide to generate a combined spectrum
+     * @param  databaseFileName database to pull data from
+     */
+    public static void generateSingleIndividualCSV(int peptideID, String databaseFileName) throws IOException {
+        fileManager fm = new fileManager();
+        spectrumMerger sm =  new spectrumMerger(peptideID);
+        String dirName = "outputCSV/IndividualSpectrum";
+
+        PeakList[] individualPeptidePeakLists = getPeakListFromDatabase(peptideID, databaseFileName);
+
+        //Generate sample individual csv's for each uncombined peak in Peaklist
+        fm.writePeakListToCSV(individualPeptidePeakLists, individualPeptidePeakLists.length, dirName);
+        System.out.println("Done");
+    }
+
+
+    private static PeakList[] getPeakListFromDatabase(int peptideID, String databaseFileName){
+        spectrumDbUtil specDB = new spectrumDbUtil(databaseFileName);
 
         PeakList[] individualPeptidePeakLists;
-
-        // get array containing peak lists of each peptide sample
-        if(specDB.connect() == true) {
-            individualPeptidePeakLists = specDB.getSpectrumPeakIntensityByProteinID2(1);
-            System.out.println("Number of peaks: " + individualPeptidePeakLists.length);
-
+        if(specDB.connect()) {
+            individualPeptidePeakLists = specDB.getSpectrumPeakIntensityByProteinID2(peptideID);
             specDB.disconnect();
         }else{
-            return;
+            System.out.println("Error Opening connection to Database");
+            return null;
         }
 
-        //Generate sample individual graphs
-        fm.writeIndividualSpectrumtoCSV(individualPeptidePeakLists, 10);
+        if(individualPeptidePeakLists == null){
+            System.out.println("individualPeptidePeakLists is null: exiting");
+            System.exit(1);
+        }
+
+        return individualPeptidePeakLists;
     }
 
 }

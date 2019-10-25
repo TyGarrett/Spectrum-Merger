@@ -2,66 +2,38 @@ package SpectrumMerger;
 
 import edu.scripps.pms.util.spectrum.Peak;
 import edu.scripps.pms.util.spectrum.PeakList;
-import javafx.util.Pair;
-import org.apache.commons.math3.complex.Complex;
-import org.jboss.util.Null;
 
 import java.io.FileWriter;
 import java.io.IOException;
 
 public class fileManager {
 
-    public fileManager(){
+    fileManager(){}
 
-    }
-    public void writeFFTtoCSV(Complex[] comp) throws IOException {
-        FileWriter csvWriter = new FileWriter("/home/ty/jupyterNotebooks/FFTSpectrum.csv");
-        csvWriter.append("real");
-        csvWriter.append(",");
-        csvWriter.append("Imaginary");
-        csvWriter.append(",");
-        csvWriter.append("combined");
-        csvWriter.append("\n");
+    void writeSpectrumArrayToCSV(float[] specArr, int peptideID, String dirPath) throws IOException {
 
-        int counter = 0;
-        for (Complex c : comp) {
-            double dist = Math.pow(c.getReal(),2) + Math.pow(c.getImaginary(), 2);
-            dist = Math.sqrt(dist);
+        FileWriter csvWriter = new FileWriter(dirPath+"/Spectrum["+peptideID+"].csv");
 
-            csvWriter.append(round(c.getReal(),5)+","+round(c.getImaginary(),5)+","+round(dist,5));
+        for (float intensity : specArr) {
+            csvWriter.append(String.valueOf(intensity)).append(",");
             csvWriter.append("\n");
-
-            counter++;
-        }
-
-        csvWriter.flush();
-        csvWriter.close();
-    }
-
-    public void writeCombinedSpectrumtoCSV(int[] specArr, int peptideID) throws IOException {
-        FileWriter csvWriter = new FileWriter("/home/ty/jupyterNotebooks/CombinedSpectrum"+peptideID+".csv");
-        int counter = 0;
-        for (int intensity : specArr) {
-            csvWriter.append(intensity+",");
-            csvWriter.append("\n");
-
-            counter++;
         }
 
         csvWriter.flush();
         csvWriter.close();
 
-        System.out.println("Wrote file{}".format(String.valueOf(peptideID)));
+        System.out.println(peptideID);
     }
 
-    public void writeIndividualSpectrumtoCSV(PeakList[] list, int numFilesToCreate) throws IOException {
+    void writePeakListToCSV(PeakList[] list, int numFilesToCreate, String dirPath) throws IOException {
 
         int counter = 0;
         for (PeakList pl : list) {
 
             if(counter == numFilesToCreate) return;
 
-            FileWriter csvWriter = new FileWriter("/home/ty/jupyterNotebooks/Spec/IndividualSpectrum" + counter + ".csv");
+            FileWriter csvWriter = new FileWriter(dirPath+"/IndividualSpectrum["+counter+"].csv");
+
             csvWriter.append("Mass");
             csvWriter.append(",");
             csvWriter.append("Intensity");
@@ -72,7 +44,7 @@ public class fileManager {
                 double intensity = p.getIntensity();
                 double M2z = p.getM2z();
 
-                csvWriter.append(M2z+","+intensity);
+                csvWriter.append(String.valueOf(M2z)).append(",").append(String.valueOf(intensity));
                 csvWriter.append("\n");
             }
 
@@ -81,9 +53,6 @@ public class fileManager {
 
             counter++;
         }
-
-
-
     }
 
     public static double round(double value, int places) {
