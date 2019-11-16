@@ -6,9 +6,11 @@ import edu.scripps.pms.util.spectrum.PeakList;
 import java.io.IOException;
 import java.util.Iterator;
 
+import javafx.util.Pair;
 import org.apache.commons.math3.complex.Complex;
 
 import java.sql.SQLException;
+import java.util.LinkedList;
 
 public class spectrumMerger {
 
@@ -19,12 +21,16 @@ public class spectrumMerger {
     // Index is mass*M2Z_ROUNDING_THRESHOLD.
     // Value is the intensity
     private float[] specArray;
+
     // Index represents the intensity of peaks in specArray[].
     // Value at each index represents the mass in specArray[].
     private int[] sortedSpecArrayByIndex;
     private int numberOfNonZeroElements;
-
     private int peptideID;
+
+    private int massKeyRunningAverage = 0;
+    private int massKeyNumberOfItems = 0;
+
 
     /*
     Constructor for spectrumMerger. Creates empty specArray.
@@ -47,6 +53,17 @@ public class spectrumMerger {
             int M2z = (int) Math.round(p.getM2z() * M2Z_ROUNDING_THRESHOLD);
             float normalizedIntensity = (float)(intensity/maxIntensity);
             specArray[M2z] += normalizedIntensity;
+        }
+    }
+
+    /*
+       adds a a list of pairs into the specArray
+     */
+    void addPairToSpecArray(LinkedList<Pair<Float, Float>> list) {
+        for (Pair p : list) {
+            float intensity = (float) p.getValue();
+            int M2z = (int) Math.round(((float) p.getKey()) * M2Z_ROUNDING_THRESHOLD);
+            specArray[M2z] += intensity;
         }
     }
 
@@ -76,9 +93,9 @@ public class spectrumMerger {
         quickSort(sortedSpecArrayByIndex, 0, sortedSpecArrayByIndex.length-1);
     }
 
-    /*
-    sorts arr[] based on the intesnity of specArray[]
-    */
+    /**
+     * sorts arr[] based on the intensity of specArray[]
+     */
     private void quickSort(int[] arr, int low, int high)
     {
         if (low < high)
@@ -118,10 +135,10 @@ public class spectrumMerger {
         return i+1;
     }
 
-
+    /**
+     * merge peaks together: start with largest and increments to smallest.
+     */
     void mergePeaksByThreshold(int ppm){
-
-        int totalPeaks = getNumberPeaks();
 
         generateSortedSpecArrayByIndex();
 
@@ -149,41 +166,46 @@ public class spectrumMerger {
                 specArray[j] = 0;
             }
         }
-
-        //System.out.println("Condensed specArr from : " + totalPeaks + ", to : " + this.numberOfNonZeroElements);
     }
 
+    /**
+     * converts spectrumArray into a mz and intensity array
+     */
+    Pair<float[], float[]> getMassIntensityArrays(){
+        float[] peakMzArray = new float[numberOfNonZeroElements];
+        float[] peakIntensityArray = new float[numberOfNonZeroElements];
+
+        int mzIndex = 0;
+        for(int i = 0; i < specArray.length; i++) {
+            if (specArray[i] != 0) {
+                peakMzArray[mzIndex] = ((float) i) / 1000;
+                peakIntensityArray[mzIndex] = specArray[i];
+                mzIndex++;
+            }
+        }
+
+        return new Pair<float[], float[]>(peakMzArray, peakIntensityArray);
+    }
+
+    /**
+     * calculates the threshold for which to merge peaks associated PPM
+     */
     int getThreshold(int ppm, int peakIdx){
-        //System.out.println("peak index: " + peakIdx + ", threshold: " + ((ppm*peakIdx)/(PPM_DIVISOR)));
         return ((ppm*peakIdx)/(PPM_DIVISOR));
     }
 
+    int getMassKey(){
+        return this.massKeyRunningAverage;
+    }
+
+    void setMassKey(int val){
+        massKeyNumberOfItems += 1;
+        massKeyRunningAverage = (massKeyRunningAverage*(massKeyNumberOfItems-1) + val) / massKeyNumberOfItems;
+    }
+
+
     public int getNumberOfNonZeroElements(){
         return this.numberOfNonZeroElements;
-    }
-
-    public int getMaxIntensityIndex(){
-        float max = -1;
-        int maxIndex = -1;
-        for(int i = 0; i<specArray.length; i++){
-            if( specArray[i] > max){
-                max = specArray[i];
-                maxIndex = i;
-            }
-        }
-        return maxIndex;
-    }
-
-    public int getNextSmallestMaxIntensityIndex(int intensity){
-        float max = -1;
-        int maxIndex = -1;
-        for(int i = 0; i<specArray.length; i++){
-            if( specArray[i] > max && specArray[i] < intensity) {
-                max = specArray[i];
-                maxIndex = i;
-            }
-        }
-        return maxIndex;
     }
 
     /*
@@ -200,14 +222,6 @@ public class spectrumMerger {
                 //System.out.println(intensity);
                 counter++;
             }
-        }
-        return counter;
-    }
-
-    private int getNumberPeaks(Complex[] comp){
-        int counter = 0;
-        for(Complex c : comp){
-            if(c.getImaginary() != 0.0 || c.getReal() != 0.0) counter++;
         }
         return counter;
     }
@@ -255,11 +269,7 @@ public class spectrumMerger {
         return peptideID;
     }
 
-    public static void main(String[] args) { }
-
-
-
-    ////////////////////////////////////PRINTS/////////////////////////////////////////////
+    //////////////////////////PRINTS/////////////////////////////////////////////
 
     /*
     For Tests

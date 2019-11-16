@@ -4,9 +4,12 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.sql.*;
+import java.util.LinkedList;
 
 import edu.scripps.pms.util.spectrum.Peak;
 import edu.scripps.pms.util.spectrum.PeakList;
+import javafx.util.Pair;
+import org.sqlite.SQLiteConfig;
 
 public class spectrumDbUtil {
 
@@ -18,45 +21,24 @@ public class spectrumDbUtil {
         this.databaseFileName = dbFileName;
     }
 
-    spectrumDbUtil(){}
-
-    public PeakList getSpectrumPeakIntensityByProteinID(int proteinID){
-
-        FloatBuffer floatBuf;
-        float[] peakMzArray;
-        float[] peakIntensityArray;
-
-        PeakList list = new PeakList();
-
+    public void changeTableName(String tableToChange, String name){
         try (Statement stmt  = specDbConnection.createStatement();
-             ResultSet rs    = stmt.executeQuery("SELECT * FROM SpectraTable WHERE peptideID = " + proteinID)){
+             ResultSet rs   = stmt.executeQuery("ALTER TABLE "+tableToChange+" RENAME TO "+name)
+        ){
 
-            while (rs.next()) {
-
-                byte[] peakMzByteArr = rs.getBytes("peakMZ");
-                byte[] intensityByteArr = rs.getBytes("peakIntensity");
-
-                //convert PeakMz byteArray to float array
-                floatBuf = ByteBuffer.wrap(peakMzByteArr).order(ByteOrder.BIG_ENDIAN).asFloatBuffer();
-                peakMzArray = new float[floatBuf.remaining()];
-                floatBuf.get(peakMzArray);
-
-                //convert PeakIntensity byteArray to float array
-                floatBuf = ByteBuffer.wrap(intensityByteArr).order(ByteOrder.BIG_ENDIAN).asFloatBuffer();
-                peakIntensityArray = new float[floatBuf.remaining()];
-                floatBuf.get(peakIntensityArray);
-
-                //combine 2 arrays into peak list array
-                for(int i=0;i<peakMzArray.length;i++){
-                    Peak p = new Peak(peakMzArray[i], peakIntensityArray[i]);
-                    list.addPeak(p);
-                }
-            }
-            return list;
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
-        return null;
+    }
+
+    public void deleteTable(String tableToDelete){
+        try (Statement stmt  = specDbConnection.createStatement();
+             ResultSet rs   = stmt.executeQuery("DROP TABLE"+tableToDelete);
+        ){
+
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
     }
 
     PeakList[] getSpectrumPeakIntensityByProteinID2(int proteinID){
@@ -117,6 +99,76 @@ public class spectrumDbUtil {
         return null;
     }
 
+
+
+    synchronized spectrumMerger generateSpectrumMerger(int proteinID){
+
+        FloatBuffer floatBuf;
+        float[] peakMzArray;
+        float[] peakIntensityArray;
+
+        spectrumMerger sm = new spectrumMerger(proteinID);
+
+        int numberOfDBHits;
+
+        //get size of database query
+        try (Statement stmt  = specDbConnection.createStatement();
+             ResultSet rs    = stmt.executeQuery("SELECT COUNT(*) FROM SpectraTable WHERE peptideID = " + proteinID)
+        ){
+            numberOfDBHits = rs.getInt(1);
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+            return null;
+        }
+
+        try (Statement stmt  = specDbConnection.createStatement();
+             ResultSet rs    = stmt.executeQuery("SELECT * FROM SpectraTable WHERE peptideID = " + proteinID)
+        ){
+
+            boolean setMassKey = false;
+            while (rs.next()) {
+
+                LinkedList<Pair<Float, Float>> pairList =  new LinkedList<Pair<Float, Float>>();
+                float maxIntensity = 0;
+
+                byte[] peakMzByteArr = rs.getBytes("peakMZ");
+                byte[] intensityByteArr = rs.getBytes("peakIntensity");
+
+                if(!setMassKey) {
+                    sm.setMassKey(rs.getInt("massKey"));
+                    setMassKey = true;
+                }
+
+
+                //convert PeakMz byteArray to float array
+                floatBuf = ByteBuffer.wrap(peakMzByteArr).order(ByteOrder.BIG_ENDIAN).asFloatBuffer();
+                peakMzArray = new float[floatBuf.remaining()];
+                floatBuf.get(peakMzArray);
+
+                //convert PeakIntensity byteArray to float array
+                floatBuf = ByteBuffer.wrap(intensityByteArr).order(ByteOrder.BIG_ENDIAN).asFloatBuffer();
+                peakIntensityArray = new float[floatBuf.remaining()];
+                floatBuf.get(peakIntensityArray);
+
+                for(int i=0;i<peakIntensityArray.length;i++){
+                    if(peakIntensityArray[i] > maxIntensity){
+                        maxIntensity = peakIntensityArray[i];
+                    }
+                }
+                for(int i=0;i<peakIntensityArray.length;i++){
+                    pairList.add(new Pair(peakMzArray[i] ,peakIntensityArray[i]/maxIntensity));
+                }
+
+                sm.addPairToSpecArray(pairList);
+
+            }
+            return sm;
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        return null;
+    }
+
     public void getTableNames() throws SQLException {
         ResultSet rs = specDbConnection.getMetaData().getTables(null, null, null, null);
         while (rs.next()) {
@@ -134,7 +186,19 @@ public class spectrumDbUtil {
             // db parameters
             String url = "jdbc:sqlite:" + databaseFileName;
             // create a connection to the database
-            specDbConnection = DriverManager.getConnection(url);
+            final int cacheSize = 100000 / 6;
+            final int pageSize = 4096;
+            SQLiteConfig config = new SQLiteConfig();
+            //optimize for multiple connections that can share data structures
+            config.setSharedCache(true);
+            config.setCacheSize(cacheSize);
+            config.setPageSize(pageSize);
+            config.setJournalMode(SQLiteConfig.JournalMode.TRUNCATE);
+            config.enableFullSync(false);
+            config.enableRecursiveTriggers(false);
+            config.setLockingMode(SQLiteConfig.LockingMode.NORMAL);
+            config.setSynchronous(SQLiteConfig.SynchronousMode.OFF); //TODO may be dangerous on some systems to have off
+            specDbConnection = DriverManager.getConnection(url);//,config.toProperties());
             isConnected = true;
 
             //System.out.println("Connection to SQLite has been established.");
@@ -205,6 +269,53 @@ public class spectrumDbUtil {
         }
     }
 
+    /**
+     * Insert a new row into the warehouses table
+     *
+     */
+    public synchronized void insertBatch(int startPeptideID, LinkedList<float[]> listOfSpecArrays, LinkedList<Integer> numElems) throws SQLException {
+
+        String SQL = "INSERT INTO mergedSpectraTable(peptideID,peakMz,peakIntensity,numElems) VALUES(?,?,?,?)";
+        PreparedStatement pstmt = specDbConnection.prepareStatement(SQL);
+        specDbConnection.setAutoCommit(false);
+
+        for (int i = 0; i < listOfSpecArrays.size(); i++){
+            float[] peakMzFloatArr;
+            float[] peakIntensityFloatArr;
+            byte[] peakMzByteArr;
+            byte[] peakIntensityByteArr;
+            peakMzFloatArr = new float[numElems.get(i)];
+            peakIntensityFloatArr = new float[numElems.get(i)];
+
+            int count = 0;
+            for(int j = 0; j<listOfSpecArrays.get(i).length - 1; j++){
+                if(listOfSpecArrays.get(i)[j] != 0){
+                    peakMzFloatArr[count] = ((float)j)/1000;
+                    peakIntensityFloatArr[count] = listOfSpecArrays.get(i)[j];
+                    count++;
+                }
+            }
+
+            peakMzByteArr = FloatArray2ByteArray(peakMzFloatArr);
+            peakIntensityByteArr = FloatArray2ByteArray(peakIntensityFloatArr);
+            int peptideID = startPeptideID + i;
+
+            pstmt.setInt(1, peptideID);
+            pstmt.setBytes(2, peakMzByteArr);
+            pstmt.setBytes(3, peakIntensityByteArr);
+            pstmt.setInt(4, numElems.get(i));
+
+            // Add above SQL statement in the batch.
+            pstmt.addBatch();
+        }
+        //Create an int[] to hold returned values
+        int[] count = pstmt.executeBatch();
+
+        //Explicitly commit statements to apply changes
+        specDbConnection.commit();
+
+    }
+
     void addMergedPeptideRow(int peptideID, float[] specArr, int numElems){
         float[] peakMzFloatArr;
         float[] peakIntensityFloatArr;
@@ -241,11 +352,5 @@ public class spectrumDbUtil {
 
 
     public static void main(String[] args) throws SQLException {
-        spectrumDbUtil db = new spectrumDbUtil("testLibDuplicateSpectraMerged.db");
-        db.connect();
-        db.getTableNames();
-        db.createNewMergedSpectraTable();
-        db.insert(5, new byte[10], new byte[10], 20000);
-        db.disconnect();
     }
 }
